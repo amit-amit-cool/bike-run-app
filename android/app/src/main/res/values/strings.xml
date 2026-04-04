@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bike &amp; Run</string>
+    <string name="title_activity_main">Bike &amp; Run</string>
+    <string name="package_name">com.bikerun.companion</string>
+    <string name="custom_url_scheme">com.bikerun.companion</string>
+</resources>

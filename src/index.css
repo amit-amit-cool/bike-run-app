@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background-color: #f9fafb;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Remove scrollbar but allow scrolling */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Leaflet — light theme */
+.leaflet-container {
+  background: #e5e7eb !important;
+  font-family: inherit !important;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px !important;
+  background: rgba(255,255,255,0.8) !important;
+}
+
+.leaflet-control-zoom a {
+  color: #374151 !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Pulsing GPS dot */
+@keyframes gps-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 181, 94, 0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(0, 181, 94, 0); }
+}
+
+.gps-dot {
+  animation: gps-pulse 2s ease-in-out infinite;
+}
+
+/* Number transition */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.metric-update {
+  animation: fade-in 200ms ease-out;
+}
+
+/* Paused pulse */
+@keyframes paused-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.paused-dot {
+  animation: paused-pulse 1.5s ease-in-out infinite;
+}
