@@ -47,7 +47,7 @@ export default function Header({ cityName, mode, onModeChange, onSearch, onUseGp
           <a
             href="https://github.com/amit-amit-cool/bike-run-app/releases/download/v1.0.0/app-debug.apk"
             title="Download Android app"
-            className="text-gray-300 hover:text-gray-400 transition-colors ml-2 shrink-0"
+            className="text-gray-400 hover:text-gray-600 transition-colors ml-2 shrink-0"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.523 15.341A5.005 5.005 0 0 0 17 13H7a5.005 5.005 0 0 0-.523 2.341A2 2 0 0 0 5 17v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-1.477-1.659ZM8.5 9a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1Zm7 0a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1ZM6.05 8.64l1.2-2.08A6.994 6.994 0 0 1 12 5a6.994 6.994 0 0 1 4.75 1.56l1.2 2.08A7.01 7.01 0 0 0 12 6a7.01 7.01 0 0 0-5.95 2.64ZM4 8l-.6 1.04A7 7 0 0 0 5 20h14a7 7 0 0 0 1.6-10.96L20 8l-1.5-.87A9 9 0 0 0 12 4a9 9 0 0 0-6.5 3.13L4 8Z"/>
