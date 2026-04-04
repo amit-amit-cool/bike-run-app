@@ -3,11 +3,13 @@ name: Build Android APK
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:   # allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to upload to release
 
     steps:
       - name: Checkout code
@@ -44,9 +46,9 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Upload APK to GitHub Release (replaces old file)
+        uses: softprops/action-gh-release@v2
         with:
-          name: bike-run-debug.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          tag_name: v1.0.0
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          fail_on_unmatched_files: true
