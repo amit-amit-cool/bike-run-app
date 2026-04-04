@@ -10,6 +10,7 @@ import MapView from './components/MapView'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useWeather } from './hooks/useWeather'
 import { useActivityTimer } from './hooks/useActivityTimer'
+import { useUpdateCheck } from './hooks/useUpdateCheck'
 
 const MAX_TRAIL = 500
 
@@ -33,6 +34,7 @@ export default function App() {
     selectedDate, setSelectedDate, availableDates, isToday,
   } = useWeather(position)
   const timer = useActivityTimer(isMoving, position, altitude, activityState)
+  const updateUrl = useUpdateCheck()
 
   // Accumulate trail during active/paused states
   const lastTrailPos = useRef(null)
@@ -120,6 +122,16 @@ export default function App() {
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-amber-700 text-xs text-center">
           ⚠️ {gpsError}
         </div>
+      )}
+
+      {/* Update available banner */}
+      {updateUrl && (
+        <a
+          href={updateUrl}
+          className="flex items-center justify-center gap-2 bg-brand-500 px-4 py-2.5 text-white text-sm font-semibold text-center"
+        >
+          🆕 New version available — tap to download
+        </a>
       )}
 
       {/* Main scrollable content */}
