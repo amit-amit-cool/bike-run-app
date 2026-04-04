@@ -24,6 +24,12 @@
 
         </activity>
 
+        <!-- Foreground service that keeps GPS alive when screen is locked -->
+        <service
+            android:name="com.getcapacitor.CapacitorGeolocationForegroundService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -42,7 +48,11 @@
     <!-- GPS & Location -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Keep GPS active while screen is on during activity tracking -->
+    <!-- Background location — required to keep tracking when screen locks -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Foreground service keeps GPS alive when screen is off -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
 </manifest>

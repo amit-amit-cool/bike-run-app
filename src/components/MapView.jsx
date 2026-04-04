@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -140,13 +140,102 @@ function makeViaIcon() {
 
 const viaIcon = makeViaIcon()
 
-// Handles tap/click anywhere on the map
-function MapClickHandler({ onMapClick }) {
-  useMapEvents({
-    click(e) {
-      onMapClick && onMapClick(e.latlng.lat, e.latlng.lng)
-    },
-  })
+// Long-press handler: attaches native touch/mouse events directly to the
+// map container — bypasses Leaflet's synthetic event layer which swallows
+// touchstart/contextmenu on many mobile browsers.
+const LONG_PRESS_MS = 600
+
+function MapLongPressHandler({ onMapClick }) {
+  const map = useMap()
+  const timerRef = useRef(null)
+  const movedRef = useRef(false)
+  const startPtRef = useRef(null)
+
+  useEffect(() => {
+    const container = map.getContainer()
+
+    const cancel = () => {
+      clearTimeout(timerRef.current)
+    }
+
+    // ── Touch (mobile) ──────────────────────────────────────
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 1) return
+      movedRef.current = false
+      const t = e.touches[0]
+      const rect = container.getBoundingClientRect()
+      startPtRef.current = L.point(t.clientX - rect.left, t.clientY - rect.top)
+      timerRef.current = setTimeout(() => {
+        if (!movedRef.current && startPtRef.current) {
+          const latlng = map.containerPointToLatLng(startPtRef.current)
+          onMapClick(latlng.lat, latlng.lng)
+        }
+      }, LONG_PRESS_MS)
+    }
+
+    const onTouchMove = (e) => {
+      // cancel if finger moves more than ~10px
+      if (startPtRef.current && e.touches.length === 1) {
+        const t = e.touches[0]
+        const rect = container.getBoundingClientRect()
+        const dx = t.clientX - rect.left - startPtRef.current.x
+        const dy = t.clientY - rect.top - startPtRef.current.y
+        if (Math.sqrt(dx * dx + dy * dy) > 10) {
+          movedRef.current = true
+          cancel()
+        }
+      }
+    }
+
+    const onTouchEnd = () => cancel()
+    const onTouchCancel = () => cancel()
+
+    // Prevent browser context-menu popup from appearing on long press
+    const onContextMenu = (e) => e.preventDefault()
+
+    // ── Mouse (desktop fallback) ─────────────────────────────
+    const onMouseDown = (e) => {
+      movedRef.current = false
+      startPtRef.current = L.point(e.offsetX, e.offsetY)
+      timerRef.current = setTimeout(() => {
+        if (!movedRef.current && startPtRef.current) {
+          const latlng = map.containerPointToLatLng(startPtRef.current)
+          onMapClick(latlng.lat, latlng.lng)
+        }
+      }, LONG_PRESS_MS)
+    }
+
+    const onMouseMove = (e) => {
+      if (!startPtRef.current) return
+      const dx = e.offsetX - startPtRef.current.x
+      const dy = e.offsetY - startPtRef.current.y
+      if (Math.sqrt(dx * dx + dy * dy) > 10) { movedRef.current = true; cancel() }
+    }
+
+    const onMouseUp = () => cancel()
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: true })
+    container.addEventListener('touchend', onTouchEnd)
+    container.addEventListener('touchcancel', onTouchCancel)
+    container.addEventListener('contextmenu', onContextMenu)
+    container.addEventListener('mousedown', onMouseDown)
+    container.addEventListener('mousemove', onMouseMove)
+    container.addEventListener('mouseup', onMouseUp)
+
+    return () => {
+      cancel()
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchCancel)
+      container.removeEventListener('contextmenu', onContextMenu)
+      container.removeEventListener('mousedown', onMouseDown)
+      container.removeEventListener('mousemove', onMouseMove)
+      container.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [map, onMapClick])
+
   return null
 }
 
@@ -237,8 +326,8 @@ export default function MapView({ position, trail, compact = false, heading, pla
           />
         )}
 
-        {/* Map click handler (Plan tab only) */}
-        {onMapClick && <MapClickHandler onMapClick={onMapClick} />}
+        {/* Long-press handler (Plan tab only) */}
+        {onMapClick && <MapLongPressHandler onMapClick={onMapClick} />}
 
         {/* Destination marker */}
         {planDestCoords && (

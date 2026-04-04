@@ -1,5 +1,5 @@
 {
-  "appId": "com.bikerun.companion",
+  "appId": "com.bikerun.app",
   "appName": "Bike & Run",
   "webDir": "dist",
   "android": {
@@ -7,7 +7,9 @@
   },
   "plugins": {
     "Geolocation": {
-      "permissions": ["location"]
+      "permissions": [
+        "location"
+      ]
     }
   }
 }

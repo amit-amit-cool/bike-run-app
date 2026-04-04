@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Geolocation } from '@capacitor/geolocation'
 
 const SPEED_THRESHOLD_KMH = 1.5
-const MAX_JUMP_KM = 1.0       // discard jump > 1 km from last good fix
-const MAX_ACCURACY_M = 35     // discard readings with > 35m horizontal error
-const SPEED_WINDOW = 5        // readings to rolling-average for display speed
+const MAX_JUMP_KM = 1.0
+const MAX_ACCURACY_M = 35
+const SPEED_WINDOW = 5
 
-// Geographic fence — Israel + small border margin
 const GEO_FENCE = { minLat: 29.4, maxLat: 33.4, minLon: 34.0, maxLon: 35.9 }
 
 function inFence(lat, lon) {
@@ -24,7 +25,82 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-export function useGeolocation() {
+function makeProcessor(setters) {
+  const { setPosition, setSpeedKmh, setHeading, setAltitude, setError, setIsMoving, setGpsReady, setGpsWaitSecs } = setters
+  const lastGoodPos = { current: null }
+  const lastTimestamp = { current: null }
+  const speedBuffer = { current: [] }
+  const stationaryTimer = { current: null }
+  const waitTimer = { current: null }
+  const waitCount = { current: 0 }
+
+  waitCount.current = 0
+  waitTimer.current = setInterval(() => {
+    waitCount.current += 1
+    setGpsWaitSecs(waitCount.current)
+  }, 1000)
+
+  const process = (lat, lon, accuracy, speed, hdg, alt, timestamp) => {
+    clearInterval(waitTimer.current)
+    setGpsWaitSecs(0)
+
+    if (!inFence(lat, lon)) return
+    const maxAcc = lastGoodPos.current ? MAX_ACCURACY_M : 60
+    if (accuracy > maxAcc) return
+    if (lastGoodPos.current) {
+      const jump = haversineKm(lastGoodPos.current.lat, lastGoodPos.current.lon, lat, lon)
+      if (jump > MAX_JUMP_KM) return
+    }
+
+    let derivedKmh = null
+    if (lastGoodPos.current && lastTimestamp.current) {
+      const distKm = haversineKm(lastGoodPos.current.lat, lastGoodPos.current.lon, lat, lon)
+      const dtSec = (timestamp - lastTimestamp.current) / 1000
+      if (dtSec > 0) derivedKmh = (distKm / dtSec) * 3600
+    }
+
+    lastGoodPos.current = { lat, lon, accuracy }
+    lastTimestamp.current = timestamp
+
+    setPosition({ lat, lon, accuracy })
+    setGpsReady(true)
+    setError(null)
+    if (alt != null) setAltitude(alt)
+    if (hdg != null) setHeading(hdg)
+
+    const rawKmh = speed != null && speed >= 0 ? speed * 3.6
+      : derivedKmh != null ? derivedKmh
+      : null
+
+    if (rawKmh != null) {
+      speedBuffer.current.push(rawKmh)
+      if (speedBuffer.current.length > SPEED_WINDOW) speedBuffer.current.shift()
+    }
+    const smoothed = speedBuffer.current.length
+      ? Math.round(speedBuffer.current.reduce((a, b) => a + b, 0) / speedBuffer.current.length * 10) / 10
+      : null
+
+    setSpeedKmh(smoothed)
+
+    if (rawKmh == null || rawKmh >= SPEED_THRESHOLD_KMH) {
+      clearTimeout(stationaryTimer.current)
+      setIsMoving(true)
+    } else {
+      clearTimeout(stationaryTimer.current)
+      stationaryTimer.current = setTimeout(() => setIsMoving(false), 3000)
+    }
+  }
+
+  const cleanup = () => {
+    clearTimeout(stationaryTimer.current)
+    clearInterval(waitTimer.current)
+  }
+
+  return { process, cleanup }
+}
+
+// ─── Native (Capacitor Android/iOS) ─────────────────────────────────────────
+function useNativeGeolocation() {
   const [position, setPosition] = useState(null)
   const [speedKmh, setSpeedKmh] = useState(null)
   const [heading, setHeading] = useState(null)
@@ -33,115 +109,106 @@ export function useGeolocation() {
   const [isMoving, setIsMoving] = useState(false)
   const [gpsReady, setGpsReady] = useState(false)
   const [gpsWaitSecs, setGpsWaitSecs] = useState(0)
+  const watchIdRef = useRef(null)
+  const cleanupRef = useRef(null)
 
-  const watchId = useRef(null)
-  const stationaryTimer = useRef(null)
-  const waitTimer = useRef(null)
-  const waitCount = useRef(0)
-  const lastGoodPos = useRef(null)
-  const lastTimestamp = useRef(null)
-  const speedBuffer = useRef([])
+  useEffect(() => {
+    let cancelled = false
 
-  const start = useCallback(() => {
-    if (!navigator.geolocation) {
-      setError('Geolocation not supported by this browser.')
-      return
+    const init = async () => {
+      try {
+        // Request permissions — on Android 10+ this covers background location
+        const perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] })
+        if (cancelled) return
+        if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
+          setError('Location permission denied')
+          return
+        }
+      } catch {
+        // Some devices don't need explicit request
+      }
+
+      const setters = { setPosition, setSpeedKmh, setHeading, setAltitude, setError, setIsMoving, setGpsReady, setGpsWaitSecs }
+      const { process, cleanup } = makeProcessor(setters)
+      cleanupRef.current = cleanup
+
+      try {
+        watchIdRef.current = await Geolocation.watchPosition(
+          { enableHighAccuracy: true, timeout: 10000 },
+          (pos, err) => {
+            if (cancelled) return
+            if (err) { setError(err.message ?? 'GPS error'); return }
+            if (!pos) return
+            const { latitude, longitude, accuracy, speed, heading: hdg, altitude: alt } = pos.coords
+            process(latitude, longitude, accuracy, speed, hdg, alt, pos.timestamp)
+          }
+        )
+      } catch (e) {
+        setError(e.message ?? 'GPS unavailable')
+      }
     }
 
-    lastGoodPos.current = null
-    lastTimestamp.current = null
-    speedBuffer.current = []
-    waitCount.current = 0
-    waitTimer.current = setInterval(() => {
-      waitCount.current += 1
-      setGpsWaitSecs(waitCount.current)
-    }, 1000)
+    init()
 
-    watchId.current = navigator.geolocation.watchPosition(
+    return () => {
+      cancelled = true
+      cleanupRef.current?.()
+      if (watchIdRef.current != null) {
+        Geolocation.clearWatch({ id: watchIdRef.current })
+      }
+    }
+  }, [])
+
+  return { position, speedKmh, heading, altitude, isMoving, gpsReady, gpsWaitSecs, error }
+}
+
+// ─── Web (Browser) ────────────────────────────────────────────────────────────
+function useWebGeolocation() {
+  const [position, setPosition] = useState(null)
+  const [speedKmh, setSpeedKmh] = useState(null)
+  const [heading, setHeading] = useState(null)
+  const [altitude, setAltitude] = useState(null)
+  const [error, setError] = useState(null)
+  const [isMoving, setIsMoving] = useState(false)
+  const [gpsReady, setGpsReady] = useState(false)
+  const [gpsWaitSecs, setGpsWaitSecs] = useState(0)
+  const watchIdRef = useRef(null)
+  const cleanupRef = useRef(null)
+
+  const start = useCallback(() => {
+    if (!navigator.geolocation) { setError('Geolocation not supported'); return }
+
+    const setters = { setPosition, setSpeedKmh, setHeading, setAltitude, setError, setIsMoving, setGpsReady, setGpsWaitSecs }
+    const { process, cleanup } = makeProcessor(setters)
+    cleanupRef.current = cleanup
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        clearInterval(waitTimer.current)
-        setGpsWaitSecs(0)
-
         const { latitude, longitude, accuracy, speed, heading: hdg, altitude: alt } = pos.coords
-
-        // 1. Geographic fence
-        if (!inFence(latitude, longitude)) return
-
-        // 2. Accuracy gate — reject poor GPS signals
-        //    Relax on very first fix so we get a starting point quickly
-        const maxAcc = lastGoodPos.current ? MAX_ACCURACY_M : 60
-        if (accuracy > maxAcc) return
-
-        // 3. Jump filter — reject teleportation glitches
-        if (lastGoodPos.current) {
-          const jump = haversineKm(lastGoodPos.current.lat, lastGoodPos.current.lon, latitude, longitude)
-          if (jump > MAX_JUMP_KM) return
-        }
-
-        // 4. Position-derived speed (more reliable than raw GPS speed in some conditions)
-        let derivedKmh = null
-        if (lastGoodPos.current && lastTimestamp.current) {
-          const distKm = haversineKm(lastGoodPos.current.lat, lastGoodPos.current.lon, latitude, longitude)
-          const dtSec = (pos.timestamp - lastTimestamp.current) / 1000
-          if (dtSec > 0) derivedKmh = (distKm / dtSec) * 3600
-        }
-
-        lastGoodPos.current = { lat: latitude, lon: longitude, accuracy }
-        lastTimestamp.current = pos.timestamp
-
-        setPosition({ lat: latitude, lon: longitude, accuracy })
-        setGpsReady(true)
-        setError(null)
-
-        if (alt != null) setAltitude(alt)
-        if (hdg != null) setHeading(hdg)
-
-        // 5. Best speed estimate: prefer GPS Doppler speed; fall back to position-derived
-        const rawKmh = speed != null ? speed * 3.6
-          : derivedKmh != null ? derivedKmh
-          : null
-
-        // 6. Rolling average for smooth display
-        if (rawKmh != null) {
-          speedBuffer.current.push(rawKmh)
-          if (speedBuffer.current.length > SPEED_WINDOW) speedBuffer.current.shift()
-        }
-        const smoothed = speedBuffer.current.length
-          ? Math.round(speedBuffer.current.reduce((a, b) => a + b, 0) / speedBuffer.current.length * 10) / 10
-          : null
-
-        setSpeedKmh(smoothed)
-
-        // 7. isMoving uses raw speed so auto-pause stays responsive
-        if (rawKmh == null || rawKmh >= SPEED_THRESHOLD_KMH) {
-          clearTimeout(stationaryTimer.current)
-          setIsMoving(true)
-        } else {
-          clearTimeout(stationaryTimer.current)
-          stationaryTimer.current = setTimeout(() => setIsMoving(false), 3000)
-        }
+        process(latitude, longitude, accuracy, speed, hdg, alt, pos.timestamp)
       },
-      (err) => {
-        setError(err.message)
-        setGpsReady(false)
-      },
+      (err) => { setError(err.message); setGpsReady(false) },
       { enableHighAccuracy: true, maximumAge: 0, timeout: Infinity }
     )
   }, [])
 
   const stop = useCallback(() => {
-    if (watchId.current != null) {
-      navigator.geolocation.clearWatch(watchId.current)
-      watchId.current = null
+    cleanupRef.current?.()
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
     }
-    clearTimeout(stationaryTimer.current)
-    clearInterval(waitTimer.current)
   }, [])
 
-  useEffect(() => {
-    start()
-    return stop
-  }, [start, stop])
+  useEffect(() => { start(); return stop }, [start, stop])
 
   return { position, speedKmh, heading, altitude, isMoving, gpsReady, gpsWaitSecs, error }
+}
+
+// ─── Auto-select platform ────────────────────────────────────────────────────
+export function useGeolocation() {
+  const isNative = Capacitor.isNativePlatform()
+  const native = useNativeGeolocation()
+  const web = useWebGeolocation()
+  return isNative ? native : web
 }

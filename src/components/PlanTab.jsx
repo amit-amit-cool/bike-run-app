@@ -81,17 +81,17 @@ export default function PlanTab({ position, mode, onRouteReady, onStart }) {
           <p className="text-xs text-red-500 mt-2 px-1">⚠️ {error}</p>
         )}
 
-        {/* Tap-to-set hint */}
+        {/* Long-press-to-set hint */}
         {position && !hasRoute && (
           <p className="text-xs text-gray-400 mt-2 px-1 text-center">
-            — or tap anywhere on the map to set your destination —
+            — or long press anywhere on the map to set your destination —
           </p>
         )}
 
         {/* Via-point hint when route exists */}
         {hasRoute && (
           <p className="text-xs text-gray-400 mt-2 px-1 text-center">
-            Tap map to add a waypoint · drag <span className="text-orange-400 font-semibold">●</span> to move · tap <span className="text-orange-400 font-semibold">●</span> to remove
+            Long press map to add a waypoint · drag <span className="text-orange-400 font-semibold">●</span> to move · tap <span className="text-orange-400 font-semibold">●</span> to remove
           </p>
         )}
       </div>

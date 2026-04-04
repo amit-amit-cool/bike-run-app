@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const ELEV_NOISE_THRESHOLD_M = 3   // GPS altitude is ±5-15m — ignore smaller changes
-const MAX_DIST_PER_UPDATE_KM = 0.1 // max 100m per GPS tick
-const GOOD_ACCURACY_M = 20         // only accumulate distance when GPS is this accurate
+const MAX_DIST_PER_UPDATE_KM = 0.2 // max 200m per GPS tick (covers slow update intervals)
+const GOOD_ACCURACY_M = 50         // accept readings up to 50m accuracy — useGeolocation already gates at 35m
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
@@ -79,7 +79,7 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
 
     // Elevation — only when GPS accuracy is reasonable (altitude is ±10-30m typically)
     if (altitude != null) {
-      const accuracyOk = position.accuracy == null || position.accuracy <= 25
+      const accuracyOk = position.accuracy == null || position.accuracy <= 50
       const prevAlt = lastAltitudeRef.current
       if (prevAlt != null && accuracyOk) {
         const delta = altitude - prevAlt
