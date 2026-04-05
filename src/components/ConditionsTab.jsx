@@ -1,4 +1,5 @@
 import { uvLabel } from '../utils/uvLabel'
+import { aqiLabel } from '../utils/aqiLabel'
 import { weatherIcon, weatherDesc } from '../utils/weatherIcon'
 import { windDirLabel, calcWindAssist } from '../utils/windAssist'
 
@@ -78,7 +79,42 @@ function BestWindowCard({ hourly, isToday }) {
   )
 }
 
-export default function ConditionsTab({ hourly, currentWeather, heading, mode, isToday }) {
+function AQICard({ airQuality }) {
+  if (!airQuality) return null
+  const { label, color, bg, border, emoji } = aqiLabel(airQuality.usAqi)
+  return (
+    <div className={`rounded-3xl p-5 border shadow-card ${bg} ${border}`}>
+      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">💨 Air Quality</div>
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-3xl">{emoji}</span>
+        <div>
+          <div className={`text-2xl font-black ${color}`}>AQI {airQuality.usAqi}</div>
+          <div className={`text-sm font-semibold ${color}`}>{label}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">PM2.5</div>
+          <div className="text-base font-bold text-gray-800">{airQuality.pm25} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
+        </div>
+        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">PM10</div>
+          <div className="text-base font-bold text-gray-800">{airQuality.pm10} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
+        </div>
+        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">NO₂</div>
+          <div className="text-base font-bold text-gray-800">{airQuality.no2} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
+        </div>
+        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">O₃</div>
+          <div className="text-base font-bold text-gray-800">{airQuality.o3} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function ConditionsTab({ hourly, currentWeather, heading, mode, isToday, airQuality }) {
   const currentHour = new Date().getHours()
 
   if (!currentWeather && !hourly.length) {
@@ -180,6 +216,9 @@ export default function ConditionsTab({ hourly, currentWeather, heading, mode, i
           </div>
         </div>
       )}
+
+      {/* Air quality card */}
+      <AQICard airQuality={airQuality} />
 
       {/* Best ride window */}
       <BestWindowCard hourly={hourly} isToday={isToday} />

@@ -32,6 +32,7 @@ export default function App() {
     hourly, currentWeather, cityName, loading, error: weatherError,
     searchCity, useGpsLocation, manualOverride,
     selectedDate, setSelectedDate, availableDates, isToday,
+    airQuality,
   } = useWeather(position)
   const timer = useActivityTimer(isMoving, position, altitude, activityState)
   const updateUrl = useUpdateCheck()
@@ -159,6 +160,7 @@ export default function App() {
               heading={heading}
               mode={mode}
               isToday={isToday}
+              airQuality={airQuality}
             />
           </>
         )}
@@ -201,6 +203,7 @@ export default function App() {
                   planDestCoords={planDestCoords}
                   planStats={planStats}
                   position={position}
+                  airQuality={airQuality}
                 />
                 <div className="px-4 pb-4">
                   <div className="rounded-3xl overflow-hidden shadow-card border border-gray-100" style={{ height: 240 }}>

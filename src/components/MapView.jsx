@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -140,6 +140,16 @@ function makeViaIcon() {
 
 const viaIcon = makeViaIcon()
 
+// Simple single-tap handler — used when tap-to-place mode is active
+function MapTapHandler({ onMapClick }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng)
+    },
+  })
+  return null
+}
+
 // Long-press handler: attaches native touch/mouse events directly to the
 // map container — bypasses Leaflet's synthetic event layer which swallows
 // touchstart/contextmenu on many mobile browsers.
@@ -254,7 +264,7 @@ function FitTrail({ trail }) {
   return null
 }
 
-export default function MapView({ position, trail, compact = false, heading, plannedRoute = [], planDestCoords = null, onMapClick, viaPoints = [], onViaPointDrag, onViaPointRemove }) {
+export default function MapView({ position, trail, compact = false, heading, plannedRoute = [], planDestCoords = null, onMapClick, tapToPlace = false, viaPoints = [], onViaPointDrag, onViaPointRemove }) {
   const defaultCenter = [32.08, 34.78]
   const center = position ? [position.lat, position.lon] : defaultCenter
   const hasTrail = trail.length >= 2
@@ -326,8 +336,9 @@ export default function MapView({ position, trail, compact = false, heading, pla
           />
         )}
 
-        {/* Long-press handler (Plan tab only) */}
-        {onMapClick && <MapLongPressHandler onMapClick={onMapClick} />}
+        {/* Tap/click handler (Plan tab only) */}
+        {onMapClick && tapToPlace && <MapTapHandler onMapClick={onMapClick} />}
+        {onMapClick && !tapToPlace && <MapLongPressHandler onMapClick={onMapClick} />}
 
         {/* Destination marker */}
         {planDestCoords && (

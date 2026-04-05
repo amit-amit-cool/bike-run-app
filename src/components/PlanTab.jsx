@@ -4,7 +4,8 @@ import MapView from './MapView'
 
 export default function PlanTab({ position, mode, onRouteReady, onStart }) {
   const [query, setQuery] = useState('')
-  const [mapClickMode, setMapClickMode] = useState(false) // tap-to-set-dest mode
+  // tapMode: null | 'dest' | 'via'
+  const [tapMode, setTapMode] = useState(null)
   const inputRef = useRef(null)
   const {
     search, searchByCoords, clear, loading, error,
@@ -18,18 +19,17 @@ export default function PlanTab({ position, mode, onRouteReady, onStart }) {
   const handleSearch = async (e) => {
     e.preventDefault()
     if (!query.trim()) return
-    setMapClickMode(false)
+    setTapMode(null)
     await search(query.trim(), position, mode)
   }
 
   const handleMapClick = async (lat, lng) => {
     if (!position) return
-    if (!hasRoute) {
-      // No dest yet — set destination
+    if (tapMode === 'dest') {
+      setTapMode(null)
       await searchByCoords(lat, lng, position, mode)
-      setMapClickMode(false)
-    } else {
-      // Route exists — add via waypoint
+    } else if (tapMode === 'via') {
+      // keep via mode active so multiple waypoints can be added
       await addViaPoint(lat, lng)
     }
   }
@@ -43,7 +43,7 @@ export default function PlanTab({ position, mode, onRouteReady, onStart }) {
   const handleClear = () => {
     clear()
     setQuery('')
-    setMapClickMode(false)
+    setTapMode(null)
     onRouteReady({ routeCoords: [], destCoords: null, destName: '', distanceKm: null, durationMin: null })
   }
 
@@ -81,17 +81,74 @@ export default function PlanTab({ position, mode, onRouteReady, onStart }) {
           <p className="text-xs text-red-500 mt-2 px-1">⚠️ {error}</p>
         )}
 
-        {/* Long-press-to-set hint */}
-        {position && !hasRoute && (
-          <p className="text-xs text-gray-400 mt-2 px-1 text-center">
-            — or long press anywhere on the map to set your destination —
-          </p>
+        {/* Action buttons row */}
+        {position && (
+          <div className="flex gap-2 mt-2">
+            {/* Set destination on map */}
+            {!hasRoute && (
+              <button
+                type="button"
+                onClick={() => setTapMode(tapMode === 'dest' ? null : 'dest')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                  tapMode === 'dest'
+                    ? 'bg-brand-500 text-white border-brand-500'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-brand-300 hover:text-brand-600'
+                }`}
+              >
+                <span>📍</span>
+                {tapMode === 'dest' ? 'Tap map to place pin' : 'Set destination on map'}
+              </button>
+            )}
+
+            {/* Change destination (when route exists) */}
+            {hasRoute && (
+              <button
+                type="button"
+                onClick={() => setTapMode(tapMode === 'dest' ? null : 'dest')}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                  tapMode === 'dest'
+                    ? 'bg-brand-500 text-white border-brand-500'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-brand-300 hover:text-brand-600'
+                }`}
+              >
+                <span>📍</span>
+                {tapMode === 'dest' ? 'Tap to change' : 'Change dest'}
+              </button>
+            )}
+
+            {/* Add via waypoint (when route exists) */}
+            {hasRoute && (
+              <button
+                type="button"
+                onClick={() => setTapMode(tapMode === 'via' ? null : 'via')}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                  tapMode === 'via'
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-orange-300 hover:text-orange-600'
+                }`}
+              >
+                <span>➕</span>
+                {tapMode === 'via' ? 'Tap to add point' : 'Add waypoint'}
+              </button>
+            )}
+
+            {/* Cancel tap mode */}
+            {tapMode && (
+              <button
+                type="button"
+                onClick={() => setTapMode(null)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200 transition-colors"
+              >
+                ✕ Cancel
+              </button>
+            )}
+          </div>
         )}
 
-        {/* Via-point hint when route exists */}
-        {hasRoute && (
-          <p className="text-xs text-gray-400 mt-2 px-1 text-center">
-            Long press map to add a waypoint · drag <span className="text-orange-400 font-semibold">●</span> to move · tap <span className="text-orange-400 font-semibold">●</span> to remove
+        {/* Via point hint when via mode active */}
+        {tapMode === 'via' && viaPoints.length > 0 && (
+          <p className="text-xs text-gray-400 mt-1.5 px-1 text-center">
+            Drag <span className="text-orange-400 font-semibold">●</span> to move · tap <span className="text-orange-400 font-semibold">●</span> to remove
           </p>
         )}
       </div>
@@ -111,11 +168,21 @@ export default function PlanTab({ position, mode, onRouteReady, onStart }) {
             trail={[]}
             plannedRoute={routeCoords}
             planDestCoords={destCoords}
-            onMapClick={handleMapClick}
+            onMapClick={tapMode ? handleMapClick : undefined}
+            tapToPlace={tapMode !== null}
             viaPoints={viaPoints}
             onViaPointDrag={updateViaPoint}
             onViaPointRemove={removeViaPoint}
           />
+        )}
+
+        {/* Tap mode overlay banner */}
+        {tapMode && (
+          <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-[2000] px-4 py-2 rounded-full text-sm font-semibold text-white shadow-lg pointer-events-none ${
+            tapMode === 'dest' ? 'bg-brand-500' : 'bg-orange-500'
+          }`}>
+            {tapMode === 'dest' ? '📍 Tap anywhere to set destination' : '➕ Tap anywhere to add waypoint'}
+          </div>
         )}
 
         {/* Loading overlay on map */}
@@ -173,7 +240,7 @@ export default function PlanTab({ position, mode, onRouteReady, onStart }) {
           </>
         ) : (
           <p className="text-sm text-gray-400 text-center py-2">
-            {loading ? 'Finding best route…' : 'Search a destination or tap the map'}
+            {loading ? 'Finding best route…' : 'Search a destination or use "Set on map"'}
           </p>
         )}
       </div>

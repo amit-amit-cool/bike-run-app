@@ -3,6 +3,26 @@ import { useState, useEffect, useRef } from 'react'
 const REFETCH_INTERVAL_MS = 10 * 60 * 1000
 const IP_GEO_DELAY_MS = 4000 // wait 4s for GPS, then try IP geolocation
 
+async function fetchAirQuality(lat, lon) {
+  const params = new URLSearchParams({
+    latitude: lat,
+    longitude: lon,
+    current: 'pm10,pm2_5,nitrogen_dioxide,ozone,us_aqi,european_aqi',
+  })
+  const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`)
+  if (!res.ok) return null
+  const data = await res.json()
+  const c = data.current
+  return {
+    usAqi: c.us_aqi,
+    euAqi: c.european_aqi,
+    pm25: Math.round(c.pm2_5 * 10) / 10,
+    pm10: Math.round(c.pm10 * 10) / 10,
+    no2: Math.round(c.nitrogen_dioxide * 10) / 10,
+    o3: Math.round(c.ozone * 10) / 10,
+  }
+}
+
 async function fetchWeather(lat, lon) {
   const params = new URLSearchParams({
     latitude: lat,
@@ -92,6 +112,7 @@ export function useWeather(gpsPosition) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [manualOverride, setManualOverride] = useState(false)
+  const [airQuality, setAirQuality] = useState(null)
   const timerRef = useRef(null)
   const ipFallbackTimer = useRef(null)
   const didLoadRef = useRef(false)
@@ -100,7 +121,10 @@ export function useWeather(gpsPosition) {
     setLoading(true)
     setError(null)
     try {
-      const weatherData = await fetchWeather(lat, lon)
+      const [weatherData] = await Promise.all([
+        fetchWeather(lat, lon),
+        fetchAirQuality(lat, lon).then((aq) => { if (aq) setAirQuality(aq) }),
+      ])
       setAllHourly(parseHourly(weatherData))
       didLoadRef.current = true
       if (!name) {
@@ -181,5 +205,6 @@ export function useWeather(gpsPosition) {
     hourly, currentWeather, cityName, loading, error,
     searchCity, useGpsLocation, manualOverride,
     selectedDate, setSelectedDate, availableDates, isToday,
+    airQuality,
   }
 }

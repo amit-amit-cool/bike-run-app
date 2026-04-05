@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { calcWindAssist, windDirLabel } from '../utils/windAssist'
 import { uvLabel } from '../utils/uvLabel'
+import { aqiLabel } from '../utils/aqiLabel'
 
 function formatPace(speedKmh) {
   if (!speedKmh || speedKmh < 0.5) return '--\'--"'
@@ -23,7 +24,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-export default function ActiveScreen({ speedKmh, heading, currentWeather, mode, timer, activityState, onPause, onResume, onFinish, planDestCoords, planStats, position }) {
+export default function ActiveScreen({ speedKmh, heading, currentWeather, mode, timer, activityState, onPause, onResume, onFinish, planDestCoords, planStats, position, airQuality }) {
   const isPaused = activityState === 'paused'
   // bike default: km/h (true), run default: pace (false)
   const [showKmhOverride, setShowKmhOverride] = useState(mode === 'bike')
@@ -212,6 +213,15 @@ export default function ActiveScreen({ speedKmh, heading, currentWeather, mode, 
           <div className={`text-sm font-semibold ${uv.color}`}>☀️ UV {Math.round(currentWeather.uv)} — {uv.label}</div>
           <div className="w-px h-4 bg-gray-200" />
           <div className="text-sm text-gray-600">{currentWeather.temp}°C</div>
+          {airQuality?.usAqi != null && (() => {
+            const aqi = aqiLabel(airQuality.usAqi)
+            return (
+              <>
+                <div className="w-px h-4 bg-gray-200" />
+                <div className={`text-sm font-semibold ${aqi.color}`}>{aqi.emoji} AQI {airQuality.usAqi}</div>
+              </>
+            )
+          })()}
         </div>
       )}
     </div>
