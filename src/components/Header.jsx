@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import pkg from '../../package.json'
+
+const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'
 
 export default function Header({ cityName, mode, onModeChange, onSearch, onUseGps, manualOverride, loading }) {
   const [query, setQuery] = useState('')
@@ -77,6 +80,11 @@ export default function Header({ cityName, mode, onModeChange, onSearch, onUseGp
               🏃 Run
             </button>
           </div>
+        </div>
+
+        {/* Version + build time */}
+        <div className="text-[10px] text-gray-300 text-right pb-1 -mt-1 tabular-nums">
+          v{pkg.version} · {new Date(buildTime).toLocaleString()}
         </div>
 
         {/* Expandable search */}
