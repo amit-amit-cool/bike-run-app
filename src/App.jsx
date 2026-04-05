@@ -110,7 +110,7 @@ export default function App() {
       <Header
         cityName={cityName}
         mode={mode}
-        onModeChange={(m) => { if (activityState === 'idle') setMode(m) }}
+        onModeChange={(m) => { if (activityState === 'idle' || activityState === 'finished') setMode(m) }}
         onSearch={searchCity}
         onUseGps={useGpsLocation}
         manualOverride={manualOverride}
