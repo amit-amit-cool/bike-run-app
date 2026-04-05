@@ -1,8 +1,9 @@
 import { uvLabel } from '../utils/uvLabel'
+import { aqiLabel } from '../utils/aqiLabel'
 import { weatherDesc, weatherIcon } from '../utils/weatherIcon'
 import { windDirLabel } from '../utils/windAssist'
 
-export default function StartScreen({ mode, currentWeather, gpsReady, gpsWaitSecs, onStart }) {
+export default function StartScreen({ mode, currentWeather, gpsReady, gpsWaitSecs, onStart, airQuality }) {
   const uv = uvLabel(currentWeather?.uv)
   const icon = weatherIcon(currentWeather?.code)
   const windDir = currentWeather ? windDirLabel(currentWeather.windDir) : ''
@@ -55,7 +56,7 @@ export default function StartScreen({ mode, currentWeather, gpsReady, gpsWaitSec
               <div className="text-sm text-gray-500">{weatherDesc(currentWeather.code)}</div>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="bg-gray-50 rounded-xl p-2.5 text-center">
               <div className={`text-sm font-bold ${uv.color}`}>UV {Math.round(currentWeather.uv)}</div>
               <div className="text-xs text-gray-400 mt-0.5">{uv.label}</div>
@@ -64,6 +65,15 @@ export default function StartScreen({ mode, currentWeather, gpsReady, gpsWaitSec
               <div className="text-sm font-bold text-gray-800">{currentWeather.windSpeed} <span className="text-xs font-normal text-gray-400">km/h</span></div>
               <div className="text-xs text-gray-400">{windDir}</div>
             </div>
+            {airQuality?.usAqi != null && (() => {
+              const aqi = aqiLabel(airQuality.usAqi)
+              return (
+                <div className={`rounded-xl p-2.5 text-center ${aqi.bg}`}>
+                  <div className={`text-sm font-bold ${aqi.color}`}>{aqi.emoji} AQI {airQuality.usAqi}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{aqi.label}</div>
+                </div>
+              )
+            })()}
             <div className="bg-gray-50 rounded-xl p-2.5 text-center">
               <div className={`text-sm font-bold ${currentWeather.uv < 6 ? 'text-brand-600' : currentWeather.uv < 8 ? 'text-amber-500' : 'text-red-500'}`}>
                 {currentWeather.uv < 6 ? 'Good' : currentWeather.uv < 8 ? 'Caution' : 'Use SPF'}

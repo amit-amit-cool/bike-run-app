@@ -178,6 +178,7 @@ export default function App() {
                   gpsReady={gpsReady}
                   gpsWaitSecs={gpsWaitSecs}
                   onStart={handleStart}
+                  airQuality={airQuality}
                 />
                 <div className="px-4 pb-4">
                   <div className="rounded-3xl overflow-hidden shadow-card border border-gray-100" style={{ height: 200 }}>
