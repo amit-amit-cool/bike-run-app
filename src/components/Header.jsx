@@ -48,7 +48,10 @@ export default function Header({ cityName, mode, onModeChange, onSearch, onUseGp
 
           {/* Android version / download icon — always links to latest release */}
           <a
-            href={latestRelease.url || `https://github.com/amit-amit-cool/bike-run-app/releases`}
+            href={latestRelease.hasUpdate
+              ? latestRelease.url
+              : `https://github.com/amit-amit-cool/bike-run-app/releases/tag/v${pkg.version}`
+            }
             title={latestRelease.hasUpdate ? `Download ${latestRelease.version}` : `v${pkg.version} — up to date`}
             className={`flex items-center gap-1 transition-colors ml-2 shrink-0 ${
               latestRelease.hasUpdate
