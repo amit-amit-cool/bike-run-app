@@ -198,6 +198,7 @@ export default function App() {
               heading={heading}
               mode={mode}
               isToday={isToday}
+              selectedDate={selectedDate}
               airQuality={airQuality}
               hourlyAqi={hourlyAqi}
             />

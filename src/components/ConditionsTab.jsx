@@ -91,7 +91,7 @@ function CurrentTimeCard({ currentWeather, airQuality, hourlyAqi }) {
 }
 
 
-export default function ConditionsTab({ hourly, currentWeather, heading, mode, isToday, airQuality, hourlyAqi = {} }) {
+export default function ConditionsTab({ hourly, currentWeather, heading, mode, isToday, selectedDate, airQuality, hourlyAqi = {} }) {
   const currentHour = new Date().getHours()
 
   if (!currentWeather && !hourly.length) {
@@ -201,7 +201,7 @@ export default function ConditionsTab({ hourly, currentWeather, heading, mode, i
       {hourly.length > 0 && (
         <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-card">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-            📅 Hourly Breakdown
+            📅 Hourly Breakdown ({isToday ? 'Today' : new Date(selectedDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })})
           </div>
           <div className="space-y-1">
             {/* Header row */}
