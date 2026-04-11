@@ -79,42 +79,8 @@ function BestWindowCard({ hourly, isToday }) {
   )
 }
 
-function AQICard({ airQuality }) {
-  if (!airQuality) return null
-  const { label, color, bg, border, emoji } = aqiLabel(airQuality.usAqi)
-  return (
-    <div className={`rounded-3xl p-5 border shadow-card ${bg} ${border}`}>
-      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">💨 Air Quality</div>
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-3xl">{emoji}</span>
-        <div>
-          <div className={`text-2xl font-black ${color}`}>AQI {airQuality.usAqi}</div>
-          <div className={`text-sm font-semibold ${color}`}>{label}</div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">PM2.5</div>
-          <div className="text-base font-bold text-gray-800">{airQuality.pm25} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
-        </div>
-        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">PM10</div>
-          <div className="text-base font-bold text-gray-800">{airQuality.pm10} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
-        </div>
-        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">NO₂</div>
-          <div className="text-base font-bold text-gray-800">{airQuality.no2} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
-        </div>
-        <div className="bg-white bg-opacity-60 rounded-xl px-3 py-2">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">O₃</div>
-          <div className="text-base font-bold text-gray-800">{airQuality.o3} <span className="text-xs font-normal text-gray-400">µg/m³</span></div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
-export default function ConditionsTab({ hourly, currentWeather, heading, mode, isToday, airQuality }) {
+export default function ConditionsTab({ hourly, currentWeather, heading, mode, isToday, airQuality, hourlyAqi = {} }) {
   const currentHour = new Date().getHours()
 
   if (!currentWeather && !hourly.length) {
@@ -217,9 +183,6 @@ export default function ConditionsTab({ hourly, currentWeather, heading, mode, i
         </div>
       )}
 
-      {/* Air quality card */}
-      <AQICard airQuality={airQuality} />
-
       {/* Best ride window */}
       <BestWindowCard hourly={hourly} isToday={isToday} />
 
@@ -231,20 +194,23 @@ export default function ConditionsTab({ hourly, currentWeather, heading, mode, i
           </div>
           <div className="space-y-1">
             {/* Header row */}
-            <div className="grid grid-cols-5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider pb-1 border-b border-gray-100">
+            <div className="grid grid-cols-6 text-[10px] font-semibold text-gray-400 uppercase tracking-wider pb-1 border-b border-gray-100">
               <span>Time</span>
               <span className="text-center">Temp</span>
               <span className="text-center">UV</span>
               <span className="text-center">Wind</span>
               <span className="text-center">Dir</span>
+              <span className="text-center">AQI</span>
             </div>
             {hourly.map((h) => {
               const isCurrent = h.hour === currentHour
               const rowUv = uvLabel(h.uv)
+              const rowAqi = hourlyAqi[h.time]
+              const rowAqiInfo = aqiLabel(rowAqi)
               return (
                 <div
                   key={h.time}
-                  className={`grid grid-cols-5 py-1.5 text-sm rounded-lg px-1 transition-colors ${
+                  className={`grid grid-cols-6 py-1.5 text-sm rounded-lg px-1 transition-colors ${
                     isCurrent ? 'bg-brand-50 font-semibold' : 'hover:bg-gray-50'
                   }`}
                 >
@@ -255,6 +221,7 @@ export default function ConditionsTab({ hourly, currentWeather, heading, mode, i
                   <span className={`text-center text-xs font-semibold ${rowUv.color}`}>{Math.round(h.uv)}</span>
                   <span className="text-center text-xs text-gray-600">{h.windSpeed}</span>
                   <span className="text-center text-xs text-gray-400">{windDirLabel(h.windDir)}</span>
+                  <span className={`text-center text-xs font-semibold ${rowAqiInfo.color}`}>{rowAqi != null ? rowAqi : '—'}</span>
                 </div>
               )
             })}

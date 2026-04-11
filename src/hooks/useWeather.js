@@ -7,19 +7,24 @@ async function fetchAirQuality(lat, lon) {
   const params = new URLSearchParams({
     latitude: lat,
     longitude: lon,
-    current: 'pm10,pm2_5,nitrogen_dioxide,ozone,us_aqi,european_aqi',
+    current: 'us_aqi',
+    hourly: 'us_aqi',
+    forecast_days: 7,
   })
   const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`)
   if (!res.ok) return null
   const data = await res.json()
   const c = data.current
+  // Build a time->aqi map for hourly lookup
+  const hourlyMap = {}
+  if (data.hourly) {
+    data.hourly.time.forEach((t, i) => {
+      hourlyMap[t] = data.hourly.us_aqi[i]
+    })
+  }
   return {
     usAqi: c.us_aqi,
-    euAqi: c.european_aqi,
-    pm25: Math.round(c.pm2_5 * 10) / 10,
-    pm10: Math.round(c.pm10 * 10) / 10,
-    no2: Math.round(c.nitrogen_dioxide * 10) / 10,
-    o3: Math.round(c.ozone * 10) / 10,
+    hourlyAqi: hourlyMap,
   }
 }
 
@@ -113,6 +118,7 @@ export function useWeather(gpsPosition) {
   const [error, setError] = useState(null)
   const [manualOverride, setManualOverride] = useState(false)
   const [airQuality, setAirQuality] = useState(null)
+  const [hourlyAqi, setHourlyAqi] = useState({})
   const timerRef = useRef(null)
   const ipFallbackTimer = useRef(null)
   const didLoadRef = useRef(false)
@@ -123,7 +129,7 @@ export function useWeather(gpsPosition) {
     try {
       const [weatherData] = await Promise.all([
         fetchWeather(lat, lon),
-        fetchAirQuality(lat, lon).then((aq) => { if (aq) setAirQuality(aq) }),
+        fetchAirQuality(lat, lon).then((aq) => { if (aq) { setAirQuality(aq); setHourlyAqi(aq.hourlyAqi || {}) } }),
       ])
       setAllHourly(parseHourly(weatherData))
       didLoadRef.current = true
@@ -205,6 +211,6 @@ export function useWeather(gpsPosition) {
     hourly, currentWeather, cityName, loading, error,
     searchCity, useGpsLocation, manualOverride,
     selectedDate, setSelectedDate, availableDates, isToday,
-    airQuality,
+    airQuality, hourlyAqi,
   }
 }

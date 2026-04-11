@@ -32,7 +32,7 @@ export default function App() {
     hourly, currentWeather, cityName, loading, error: weatherError,
     searchCity, useGpsLocation, manualOverride,
     selectedDate, setSelectedDate, availableDates, isToday,
-    airQuality,
+    airQuality, hourlyAqi,
   } = useWeather(position)
   const timer = useActivityTimer(isMoving, position, altitude, activityState)
   const updateUrl = useUpdateCheck()
@@ -161,6 +161,7 @@ export default function App() {
               mode={mode}
               isToday={isToday}
               airQuality={airQuality}
+              hourlyAqi={hourlyAqi}
             />
           </>
         )}
