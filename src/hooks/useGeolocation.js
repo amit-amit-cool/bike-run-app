@@ -3,16 +3,8 @@ import { Capacitor } from '@capacitor/core'
 import { Geolocation } from '@capacitor/geolocation'
 
 const SPEED_THRESHOLD_KMH = 1.5
-const MAX_JUMP_KM = 1.0
-const MAX_ACCURACY_M = 35
+const MAX_JUMP_KM = 2.0
 const SPEED_WINDOW = 5
-
-const GEO_FENCE = { minLat: 29.4, maxLat: 33.4, minLon: 34.0, maxLon: 35.9 }
-
-function inFence(lat, lon) {
-  return lat >= GEO_FENCE.minLat && lat <= GEO_FENCE.maxLat &&
-         lon >= GEO_FENCE.minLon && lon <= GEO_FENCE.maxLon
-}
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
@@ -44,9 +36,7 @@ function makeProcessor(setters) {
     clearInterval(waitTimer.current)
     setGpsWaitSecs(0)
 
-    if (!inFence(lat, lon)) return
-    const maxAcc = lastGoodPos.current ? MAX_ACCURACY_M : 60
-    if (accuracy > maxAcc) return
+    // Only reject obvious teleport glitches
     if (lastGoodPos.current) {
       const jump = haversineKm(lastGoodPos.current.lat, lastGoodPos.current.lon, lat, lon)
       if (jump > MAX_JUMP_KM) return

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const ELEV_NOISE_THRESHOLD_M = 3   // GPS altitude is ±5-15m — ignore smaller changes
-const MAX_DIST_PER_UPDATE_KM = 0.2 // max 200m per GPS tick (covers slow update intervals)
-const GOOD_ACCURACY_M = 50         // accept readings up to 50m accuracy — useGeolocation already gates at 35m
+const MAX_DIST_PER_UPDATE_KM = 0.5 // max 500m per GPS tick
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
@@ -75,38 +74,34 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState,
       return
     }
 
-    // Distance — only when GPS accuracy is good enough
+    // Distance accumulation
     const prev = lastPositionRef.current
     if (prev) {
-      const accuracyOk = position.accuracy == null || position.accuracy <= GOOD_ACCURACY_M
-      if (accuracyOk) {
-        const dist = haversineKm(prev.lat, prev.lon, position.lat, position.lon)
-        if (dist > 0 && dist < MAX_DIST_PER_UPDATE_KM) {
-          setTotalDistanceKm((d) => {
-            const newDist = d + dist
-            // Check if we crossed a km boundary for splits
-            const prevKm = Math.floor(d)
-            const newKm = Math.floor(newDist)
-            if (newKm > prevKm && prevKm >= 0) {
-              setSplits((s) => {
-                const splitMs = movingMs - splitStartMsRef.current
-                splitStartMsRef.current = movingMs
-                splitStartRef.current = newKm
-                return [...s, { km: newKm, movingMs: splitMs }]
-              })
-            }
-            return newDist
-          })
-        }
+      const dist = haversineKm(prev.lat, prev.lon, position.lat, position.lon)
+      if (dist > 0 && dist < MAX_DIST_PER_UPDATE_KM) {
+        setTotalDistanceKm((d) => {
+          const newDist = d + dist
+          // Check if we crossed a km boundary for splits
+          const prevKm = Math.floor(d)
+          const newKm = Math.floor(newDist)
+          if (newKm > prevKm && prevKm >= 0) {
+            setSplits((s) => {
+              const splitMs = movingMs - splitStartMsRef.current
+              splitStartMsRef.current = movingMs
+              splitStartRef.current = newKm
+              return [...s, { km: newKm, movingMs: splitMs }]
+            })
+          }
+          return newDist
+        })
       }
     }
     lastPositionRef.current = position
 
-    // Elevation — only when GPS accuracy is reasonable (altitude is ±10-30m typically)
+    // Elevation accumulation
     if (altitude != null) {
-      const accuracyOk = position.accuracy == null || position.accuracy <= 50
       const prevAlt = lastAltitudeRef.current
-      if (prevAlt != null && accuracyOk) {
+      if (prevAlt != null) {
         const delta = altitude - prevAlt
         if (Math.abs(delta) >= ELEV_NOISE_THRESHOLD_M) {
           if (delta > 0) setElevGainM((g) => g + delta)
