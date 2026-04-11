@@ -42,9 +42,17 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      - name: Decode signing keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/bikerun.keystore
+
+      - name: Build signed release APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleRelease
+        env:
+          BIKERUN_STORE_FILE: bikerun.keystore
+          BIKERUN_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          BIKERUN_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          BIKERUN_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Read version from package.json
         id: version
@@ -55,5 +63,5 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
