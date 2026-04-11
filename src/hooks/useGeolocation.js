@@ -148,6 +148,8 @@ function useWebGeolocation() {
   const watchIdRef = useRef(null)
   const cleanupRef = useRef(null)
 
+  const retryTimer = useRef(null)
+
   const start = useCallback(() => {
     if (!navigator.geolocation) { setError('Geolocation not supported'); return }
 
@@ -157,15 +159,29 @@ function useWebGeolocation() {
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        clearTimeout(retryTimer.current)
         const { latitude, longitude, accuracy, speed, heading: hdg, altitude: alt } = pos.coords
         process(latitude, longitude, accuracy, speed, hdg, alt, pos.timestamp)
       },
-      (err) => { setError(err.message); setGpsReady(false) },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: Infinity }
+      (err) => {
+        setError(err.message)
+        setGpsReady(false)
+        // Retry after 2s — handles permission grant not restarting the watcher
+        clearTimeout(retryTimer.current)
+        retryTimer.current = setTimeout(() => {
+          if (watchIdRef.current != null) {
+            navigator.geolocation.clearWatch(watchIdRef.current)
+          }
+          cleanupRef.current?.()
+          start()
+        }, 2000)
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     )
   }, [])
 
   const stop = useCallback(() => {
+    clearTimeout(retryTimer.current)
     cleanupRef.current?.()
     if (watchIdRef.current != null) {
       navigator.geolocation.clearWatch(watchIdRef.current)
