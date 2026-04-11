@@ -4,6 +4,18 @@ import pkg from '../../package.json'
 const CURRENT_VERSION = `v${pkg.version}`
 const RELEASES_API = 'https://api.github.com/repos/amit-amit-cool/bike-run-app/releases/latest'
 
+// Compare semver strings like "v1.2.0" > "v1.0.0"
+function isNewer(remote, local) {
+  const parse = (v) => v.replace(/^v/, '').split('.').map(Number)
+  const r = parse(remote)
+  const l = parse(local)
+  for (let i = 0; i < 3; i++) {
+    if ((r[i] || 0) > (l[i] || 0)) return true
+    if ((r[i] || 0) < (l[i] || 0)) return false
+  }
+  return false
+}
+
 export function useUpdateCheck() {
   const [latest, setLatest] = useState({ url: null, version: null, hasUpdate: false })
 
@@ -16,7 +28,7 @@ export function useUpdateCheck() {
           setLatest({
             url: apk?.browser_download_url || data.html_url,
             version: data.tag_name,
-            hasUpdate: data.tag_name !== CURRENT_VERSION,
+            hasUpdate: isNewer(data.tag_name, CURRENT_VERSION),
           })
         }
       })
