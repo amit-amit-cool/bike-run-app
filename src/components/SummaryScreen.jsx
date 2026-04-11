@@ -215,23 +215,23 @@ export default function SummaryScreen({ mode, timer, currentWeather, airQuality,
 
         {/* Three hero metrics */}
         <div className="grid grid-cols-3 divide-x divide-gray-100">
-          <div className="text-center px-2">
-            <div className={`text-3xl font-black tabular-nums ${isBike ? 'text-brand-500' : 'text-orange-500'}`}>
+          <div className="text-center px-1">
+            <div className={`text-2xl font-black tabular-nums leading-tight ${isBike ? 'text-brand-500' : 'text-orange-500'}`}>
               {hasData ? timer.totalDistanceKm : '—'}
             </div>
-            <div className="text-xs text-gray-400 mt-1">km</div>
+            <div className="text-[10px] text-gray-400 mt-1">km</div>
           </div>
-          <div className="text-center px-2">
-            <div className="text-3xl font-black tabular-nums text-gray-900">
+          <div className="text-center px-1">
+            <div className="text-lg font-black tabular-nums leading-tight text-gray-900 font-mono">
               {timer.movingTimeString || timer.timeString}
             </div>
-            <div className="text-xs text-gray-400 mt-1">moving time</div>
+            <div className="text-[10px] text-gray-400 mt-1">moving time</div>
           </div>
-          <div className="text-center px-2">
-            <div className={`text-3xl font-black tabular-nums ${isBike ? 'text-brand-500' : 'text-orange-500'}`}>
+          <div className="text-center px-1">
+            <div className={`text-2xl font-black tabular-nums leading-tight ${isBike ? 'text-brand-500' : 'text-orange-500'}`}>
               {avgDisplay}
             </div>
-            <div className="text-xs text-gray-400 mt-1">{avgUnit}</div>
+            <div className="text-[10px] text-gray-400 mt-1">{avgUnit}</div>
           </div>
         </div>
       </div>
