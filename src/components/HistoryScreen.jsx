@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 function formatDuration(ms) {
   const sec = Math.floor(ms / 1000)
@@ -21,7 +21,6 @@ function formatDate(isoString) {
   const now = new Date()
   const diff = now - d
   const days = Math.floor(diff / 86400000)
-
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7) return d.toLocaleDateString('en-US', { weekday: 'long' })
@@ -32,11 +31,120 @@ function formatTime(isoString) {
   return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
+// Get ISO week number
+function getWeekKey(date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+  const week1 = new Date(d.getFullYear(), 0, 4)
+  const weekNum = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
+  return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`
+}
+
+function getWeekLabel(weekKey) {
+  const [year, w] = weekKey.split('-W')
+  const weekNum = parseInt(w)
+  // Find Monday of this ISO week
+  const jan4 = new Date(parseInt(year), 0, 4)
+  const dayOfWeek = (jan4.getDay() + 6) % 7
+  const monday = new Date(jan4)
+  monday.setDate(jan4.getDate() - dayOfWeek + (weekNum - 1) * 7)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  const now = new Date()
+  const nowMonday = new Date(now)
+  nowMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+  nowMonday.setHours(0, 0, 0, 0)
+  monday.setHours(0, 0, 0, 0)
+
+  if (monday.getTime() === nowMonday.getTime()) return 'This Week'
+  if (nowMonday - monday < 8 * 86400000 && nowMonday > monday) return 'Last Week'
+
+  const fmt = { month: 'short', day: 'numeric' }
+  return `${monday.toLocaleDateString('en-US', fmt)} – ${sunday.toLocaleDateString('en-US', fmt)}`
+}
+
+function getMonthKey(date) {
+  const d = new Date(date)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function getMonthLabel(monthKey) {
+  const [year, month] = monthKey.split('-')
+  const d = new Date(parseInt(year), parseInt(month) - 1)
+  const now = new Date()
+  if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) return 'This Month'
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1)
+  if (d.getMonth() === prev.getMonth() && d.getFullYear() === prev.getFullYear()) return 'Last Month'
+  return d.toLocaleDateString('en-US', { month: 'long', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+}
+
+function aggregate(items) {
+  return {
+    count: items.length,
+    distanceKm: Math.round(items.reduce((s, a) => s + (a.distanceKm || 0), 0) * 10) / 10,
+    movingMs: items.reduce((s, a) => s + (a.movingMs || 0), 0),
+    calories: items.reduce((s, a) => s + (a.calories || 0), 0),
+    elevGainM: items.reduce((s, a) => s + (a.elevGainM || 0), 0),
+  }
+}
+
+function PeriodSummary({ stats }) {
+  return (
+    <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-card">
+      <div className="grid grid-cols-5 divide-x divide-gray-100 text-center">
+        <div>
+          <div className="text-base font-black text-brand-500 tabular-nums">{stats.distanceKm}</div>
+          <div className="text-[9px] text-gray-400">km</div>
+        </div>
+        <div>
+          <div className="text-base font-black text-gray-900 tabular-nums">{stats.count}</div>
+          <div className="text-[9px] text-gray-400">rides</div>
+        </div>
+        <div>
+          <div className="text-base font-black text-orange-500 tabular-nums">{formatDuration(stats.movingMs)}</div>
+          <div className="text-[9px] text-gray-400">time</div>
+        </div>
+        <div>
+          <div className="text-base font-black text-red-500 tabular-nums">{stats.calories}</div>
+          <div className="text-[9px] text-gray-400">kcal</div>
+        </div>
+        <div>
+          <div className="text-base font-black text-green-600 tabular-nums">+{stats.elevGainM}</div>
+          <div className="text-[9px] text-gray-400">elev m</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function HistoryScreen({ activities, onDelete, onRename }) {
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+  const [period, setPeriod] = useState('all') // all | week | month
+
+  const grouped = useMemo(() => {
+    const groups = {}
+    activities.forEach((a) => {
+      let key, label
+      if (period === 'week') {
+        key = getWeekKey(a.date)
+        label = getWeekLabel(key)
+      } else if (period === 'month') {
+        key = getMonthKey(a.date)
+        label = getMonthLabel(key)
+      } else {
+        key = formatDate(a.date)
+        label = key
+      }
+      if (!groups[key]) groups[key] = { label, items: [] }
+      groups[key].items.push(a)
+    })
+    return Object.values(groups)
+  }, [activities, period])
 
   if (activities.length === 0) {
     return (
@@ -50,14 +158,6 @@ export default function HistoryScreen({ activities, onDelete, onRename }) {
     )
   }
 
-  // Group activities by date
-  const grouped = {}
-  activities.forEach((a) => {
-    const key = formatDate(a.date)
-    if (!grouped[key]) grouped[key] = []
-    grouped[key].push(a)
-  })
-
   const handleStartEdit = (a) => {
     setEditingId(a.id)
     setEditTitle(a.title)
@@ -68,54 +168,59 @@ export default function HistoryScreen({ activities, onDelete, onRename }) {
     setEditingId(null)
   }
 
+  const allStats = aggregate(activities)
+
   return (
-    <div className="max-w-2xl mx-auto w-full px-4 py-5 flex flex-col gap-4">
+    <div className="max-w-2xl mx-auto w-full px-4 py-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-black text-gray-900">Activity History</h2>
+        <h2 className="text-lg font-black text-gray-900">History</h2>
         <span className="text-xs text-gray-400">{activities.length} {activities.length === 1 ? 'activity' : 'activities'}</span>
       </div>
 
-      {/* Summary totals */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-card">
-        <div className="grid grid-cols-3 divide-x divide-gray-100 text-center">
-          <div>
-            <div className="text-xl font-black text-brand-500 tabular-nums">
-              {Math.round(activities.reduce((s, a) => s + (a.distanceKm || 0), 0) * 10) / 10}
-            </div>
-            <div className="text-[10px] text-gray-400">total km</div>
-          </div>
-          <div>
-            <div className="text-xl font-black text-gray-900 tabular-nums">
-              {activities.length}
-            </div>
-            <div className="text-[10px] text-gray-400">activities</div>
-          </div>
-          <div>
-            <div className="text-xl font-black text-orange-500 tabular-nums">
-              {formatDuration(activities.reduce((s, a) => s + (a.movingMs || 0), 0))}
-            </div>
-            <div className="text-[10px] text-gray-400">total time</div>
-          </div>
-        </div>
+      {/* Period toggle */}
+      <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+        {[
+          { id: 'all', label: 'All' },
+          { id: 'week', label: 'Weekly' },
+          { id: 'month', label: 'Monthly' },
+        ].map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setPeriod(p.id)}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+              period === p.id
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
 
-      {/* Activity list grouped by date */}
-      {Object.entries(grouped).map(([dateLabel, items]) => (
-        <div key={dateLabel}>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{dateLabel}</div>
-          <div className="flex flex-col gap-2">
-            {items.map((a) => {
+      {/* All-time totals */}
+      {period === 'all' && <PeriodSummary stats={allStats} />}
+
+      {/* Grouped sections */}
+      {grouped.map((group) => {
+        const periodStats = period !== 'all' ? aggregate(group.items) : null
+
+        return (
+          <div key={group.label} className="flex flex-col gap-2">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{group.label}</div>
+
+            {/* Period totals for week/month */}
+            {periodStats && <PeriodSummary stats={periodStats} />}
+
+            {/* Activity cards */}
+            {group.items.map((a) => {
               const isBike = a.mode === 'bike'
               const isExpanded = expandedId === a.id
               const isEditing = editingId === a.id
               const isConfirmingDelete = confirmDeleteId === a.id
 
               return (
-                <div
-                  key={a.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden"
-                >
-                  {/* Main row — tap to expand */}
+                <div key={a.id} className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : a.id)}
                     className="w-full p-4 flex items-center gap-3 text-left"
@@ -139,7 +244,12 @@ export default function HistoryScreen({ activities, onDelete, onRename }) {
                       ) : (
                         <div className="text-sm font-bold text-gray-900 truncate">{a.title}</div>
                       )}
-                      <div className="text-[10px] text-gray-400">{formatTime(a.date)}</div>
+                      <div className="text-[10px] text-gray-400">
+                        {period !== 'all'
+                          ? `${formatDate(a.date)} · ${formatTime(a.date)}`
+                          : formatTime(a.date)
+                        }
+                      </div>
                     </div>
                     <div className="text-right shrink-0">
                       <div className={`text-lg font-black tabular-nums ${isBike ? 'text-brand-500' : 'text-orange-500'}`}>
@@ -152,7 +262,6 @@ export default function HistoryScreen({ activities, onDelete, onRename }) {
                     </svg>
                   </button>
 
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div className="px-4 pb-4 border-t border-gray-50">
                       <div className="grid grid-cols-3 gap-2 py-3">
@@ -188,7 +297,6 @@ export default function HistoryScreen({ activities, onDelete, onRename }) {
                         )}
                       </div>
 
-                      {/* Action buttons */}
                       <div className="flex gap-2 pt-2 border-t border-gray-50">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleStartEdit(a) }}
@@ -226,8 +334,8 @@ export default function HistoryScreen({ activities, onDelete, onRename }) {
               )
             })}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
