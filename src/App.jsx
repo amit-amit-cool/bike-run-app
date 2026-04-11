@@ -34,8 +34,8 @@ export default function App() {
     selectedDate, setSelectedDate, availableDates, isToday,
     airQuality, hourlyAqi,
   } = useWeather(position)
-  const timer = useActivityTimer(isMoving, position, altitude, activityState)
-  const updateUrl = useUpdateCheck()
+  const timer = useActivityTimer(isMoving, position, altitude, activityState, speedKmh)
+  const latestRelease = useUpdateCheck()
 
   // Accumulate trail during active/paused states
   const lastTrailPos = useRef(null)
@@ -116,6 +116,7 @@ export default function App() {
         onUseGps={useGpsLocation}
         manualOverride={manualOverride}
         loading={loading}
+        latestRelease={latestRelease}
       />
 
       {/* GPS error banner (only in idle/not-started state) */}
@@ -126,12 +127,12 @@ export default function App() {
       )}
 
       {/* Update available banner */}
-      {updateUrl && (
+      {latestRelease.hasUpdate && latestRelease.url && (
         <a
-          href={updateUrl}
+          href={latestRelease.url}
           className="flex items-center justify-center gap-2 bg-brand-500 px-4 py-2.5 text-white text-sm font-semibold text-center"
         >
-          🆕 New version available — tap to download
+          New version {latestRelease.version} available — tap to download
         </a>
       )}
 
@@ -228,6 +229,9 @@ export default function App() {
                 <SummaryScreen
                   mode={mode}
                   timer={timer}
+                  currentWeather={currentWeather}
+                  airQuality={airQuality}
+                  trail={trail}
                   onDismiss={handleNewActivity}
                   onHome={handleHome}
                 />

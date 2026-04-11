@@ -16,7 +16,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-export function useActivityTimer(isGpsMoving, position, altitude, activityState) {
+export function useActivityTimer(isGpsMoving, position, altitude, activityState, speedKmh) {
   const isRunning = activityState === 'active'
 
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -24,12 +24,17 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
   const [totalDistanceKm, setTotalDistanceKm] = useState(0)
   const [elevGainM, setElevGainM] = useState(0)
   const [elevLossM, setElevLossM] = useState(0)
+  const [maxSpeedKmh, setMaxSpeedKmh] = useState(0)
+  const [splits, setSplits] = useState([])          // per-km splits
+  const [elevationProfile, setElevationProfile] = useState([]) // altitude samples
 
   const intervalRef = useRef(null)
   const lastTickRef = useRef(null)
   const lastPositionRef = useRef(null)
   const lastAltitudeRef = useRef(null)
   const isGpsMovingRef = useRef(isGpsMoving)
+  const splitStartRef = useRef(0)       // distance at start of current km split
+  const splitStartMsRef = useRef(0)     // movingMs at start of current km split
 
   // Keep ref in sync so the interval always sees the latest value
   useEffect(() => { isGpsMovingRef.current = isGpsMoving }, [isGpsMoving])
@@ -56,6 +61,12 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
     return () => clearInterval(intervalRef.current)
   }, [isRunning])
 
+  // Max speed tracking
+  useEffect(() => {
+    if (!isRunning || speedKmh == null) return
+    setMaxSpeedKmh((prev) => Math.max(prev, speedKmh))
+  }, [speedKmh, isRunning])
+
   // Distance + elevation accumulation
   useEffect(() => {
     if (!position || !isRunning) {
@@ -71,7 +82,21 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
       if (accuracyOk) {
         const dist = haversineKm(prev.lat, prev.lon, position.lat, position.lon)
         if (dist > 0 && dist < MAX_DIST_PER_UPDATE_KM) {
-          setTotalDistanceKm((d) => d + dist)
+          setTotalDistanceKm((d) => {
+            const newDist = d + dist
+            // Check if we crossed a km boundary for splits
+            const prevKm = Math.floor(d)
+            const newKm = Math.floor(newDist)
+            if (newKm > prevKm && prevKm >= 0) {
+              setSplits((s) => {
+                const splitMs = movingMs - splitStartMsRef.current
+                splitStartMsRef.current = movingMs
+                splitStartRef.current = newKm
+                return [...s, { km: newKm, movingMs: splitMs }]
+              })
+            }
+            return newDist
+          })
         }
       }
     }
@@ -91,8 +116,10 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
       } else if (prevAlt == null) {
         lastAltitudeRef.current = altitude
       }
+      // Sample elevation profile (every position update)
+      setElevationProfile((ep) => [...ep, Math.round(altitude)])
     }
-  }, [position, altitude, isRunning])
+  }, [position, altitude, isRunning, movingMs])
 
   const reset = useCallback(() => {
     setElapsedMs(0)
@@ -100,8 +127,13 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
     setTotalDistanceKm(0)
     setElevGainM(0)
     setElevLossM(0)
+    setMaxSpeedKmh(0)
+    setSplits([])
+    setElevationProfile([])
     lastPositionRef.current = null
     lastAltitudeRef.current = null
+    splitStartRef.current = 0
+    splitStartMsRef.current = 0
   }, [])
 
   const elapsedSec = Math.floor(elapsedMs / 1000)
@@ -117,13 +149,25 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState)
       ? Math.round((totalDistanceKm / movingHours) * 10) / 10
       : null
 
+  // Moving time formatted
+  const movingSec = Math.floor(movingMs / 1000)
+  const mh = Math.floor(movingSec / 3600)
+  const mm = Math.floor((movingSec % 3600) / 60)
+  const ms2 = movingSec % 60
+  const movingTimeString = `${String(mh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ms2).padStart(2, '0')}`
+
   return {
     timeString,
+    movingTimeString,
     elapsedMs,
+    movingMs,
     totalDistanceKm: Math.round(totalDistanceKm * 100) / 100,
     avgSpeedKmh,
+    maxSpeedKmh: Math.round(maxSpeedKmh * 10) / 10,
     elevGainM: Math.round(elevGainM),
     elevLossM: Math.round(elevLossM),
+    splits,
+    elevationProfile,
     reset,
   }
 }
