@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const ELEV_NOISE_THRESHOLD_M = 3   // GPS altitude is ±5-15m — ignore smaller changes
-const MAX_DIST_PER_UPDATE_KM = 0.5 // max 500m per GPS tick
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371
@@ -78,7 +76,7 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState,
     const prev = lastPositionRef.current
     if (prev) {
       const dist = haversineKm(prev.lat, prev.lon, position.lat, position.lon)
-      if (dist > 0 && dist < MAX_DIST_PER_UPDATE_KM) {
+      if (dist > 0) {
         setTotalDistanceKm((d) => {
           const newDist = d + dist
           // Check if we crossed a km boundary for splits
@@ -103,12 +101,10 @@ export function useActivityTimer(isGpsMoving, position, altitude, activityState,
       const prevAlt = lastAltitudeRef.current
       if (prevAlt != null) {
         const delta = altitude - prevAlt
-        if (Math.abs(delta) >= ELEV_NOISE_THRESHOLD_M) {
-          if (delta > 0) setElevGainM((g) => g + delta)
-          else setElevLossM((l) => l + Math.abs(delta))
-          lastAltitudeRef.current = altitude
-        }
-      } else if (prevAlt == null) {
+        if (delta > 0) setElevGainM((g) => g + delta)
+        else if (delta < 0) setElevLossM((l) => l + Math.abs(delta))
+        lastAltitudeRef.current = altitude
+      } else {
         lastAltitudeRef.current = altitude
       }
       // Sample elevation profile (every position update)

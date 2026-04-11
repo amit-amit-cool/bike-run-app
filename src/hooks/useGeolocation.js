@@ -2,8 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Geolocation } from '@capacitor/geolocation'
 
-const SPEED_THRESHOLD_KMH = 1.5
-const MAX_JUMP_KM = 2.0
 const SPEED_WINDOW = 5
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -22,7 +20,6 @@ function makeProcessor(setters) {
   const lastGoodPos = { current: null }
   const lastTimestamp = { current: null }
   const speedBuffer = { current: [] }
-  const stationaryTimer = { current: null }
   const waitTimer = { current: null }
   const waitCount = { current: 0 }
 
@@ -35,12 +32,6 @@ function makeProcessor(setters) {
   const process = (lat, lon, accuracy, speed, hdg, alt, timestamp) => {
     clearInterval(waitTimer.current)
     setGpsWaitSecs(0)
-
-    // Only reject obvious teleport glitches
-    if (lastGoodPos.current) {
-      const jump = haversineKm(lastGoodPos.current.lat, lastGoodPos.current.lon, lat, lon)
-      if (jump > MAX_JUMP_KM) return
-    }
 
     let derivedKmh = null
     if (lastGoodPos.current && lastTimestamp.current) {
@@ -71,18 +62,10 @@ function makeProcessor(setters) {
       : null
 
     setSpeedKmh(smoothed)
-
-    if (rawKmh == null || rawKmh >= SPEED_THRESHOLD_KMH) {
-      clearTimeout(stationaryTimer.current)
-      setIsMoving(true)
-    } else {
-      clearTimeout(stationaryTimer.current)
-      stationaryTimer.current = setTimeout(() => setIsMoving(false), 3000)
-    }
+    setIsMoving(true)
   }
 
   const cleanup = () => {
-    clearTimeout(stationaryTimer.current)
     clearInterval(waitTimer.current)
   }
 
