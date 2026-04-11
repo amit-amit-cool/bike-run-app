@@ -46,9 +46,14 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Upload APK to GitHub Release (replaces old file)
+      - name: Read version from package.json
+        id: version
+        run: echo "tag=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           files: android/app/build/outputs/apk/debug/app-debug.apk
           fail_on_unmatched_files: true
