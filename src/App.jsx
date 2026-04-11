@@ -62,7 +62,7 @@ export default function App() {
 
   // Auto-save activity to history when finished
   useEffect(() => {
-    if (activityState === 'finished' && !didSaveRef.current && timer.totalDistanceKm > 0) {
+    if (activityState === 'finished' && !didSaveRef.current) {
       didSaveRef.current = true
       const hours = timer.movingMs / 3_600_000
       const speedKmhAvg = hours > 0 ? timer.totalDistanceKm / hours : 0
