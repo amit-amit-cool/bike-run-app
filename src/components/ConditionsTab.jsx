@@ -44,36 +44,47 @@ function SunProtectionTip(uv) {
   return { icon: '🚫', text: 'Extreme UV. Minimize time outdoors. Full protection.' }
 }
 
-function BestWindowCard({ hourly, isToday }) {
-  if (!hourly.length) return null
+function CurrentTimeCard({ currentWeather, airQuality, hourlyAqi }) {
+  if (!currentWeather) return null
 
-  // Find 2-hour window with lowest average UV during daylight (6am–8pm)
-  const daylight = hourly.filter((h) => h.hour >= 6 && h.hour <= 20)
-  if (!daylight.length) return null
+  const now = new Date()
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const uv = uvLabel(currentWeather.uv)
+  const wind = windDirLabel(currentWeather.windDir)
+  const icon = weatherIcon(currentWeather.code)
 
-  let best = daylight[0]
-  for (const h of daylight) {
-    if (h.uv < best.uv) best = h
-  }
-
-  const timeStr = `${String(best.hour).padStart(2, '0')}:00`
-  const { color } = uvLabel(best.uv)
+  // Get current AQI from hourly data or airQuality object
+  const currentHourKey = `${now.toISOString().split('T')[0]}T${String(now.getHours()).padStart(2, '0')}:00`
+  const aqiValue = hourlyAqi?.[currentHourKey] ?? airQuality?.usAqi
+  const aqi = aqiLabel(aqiValue)
 
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-card">
       <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-        🕐 {isToday ? 'Best Time Today' : 'Best Time This Day'}
+        🕐 Right Now — {timeStr}
       </div>
-      <div className="flex items-center gap-3">
-        <div className="text-3xl">{weatherIcon(best.code)}</div>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="text-3xl">{icon}</div>
         <div>
-          <div className="text-lg font-bold text-gray-900">{timeStr}</div>
-          <div className="text-sm text-gray-500">Lowest UV of the day</div>
+          <div className="text-lg font-bold text-gray-900">{currentWeather.temp}°C</div>
+          <div className="text-sm text-gray-500">{weatherDesc(currentWeather.code)}</div>
         </div>
-        <div className="ml-auto text-right">
-          <div className={`text-2xl font-black ${color}`}>UV {Math.round(best.uv)}</div>
-          <div className="text-xs text-gray-400">{best.temp}°C · {best.windSpeed} km/h</div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+          <div className={`text-lg font-bold ${uv.color}`}>{Math.round(currentWeather.uv)}</div>
+          <div className="text-[10px] text-gray-400">UV {uv.label}</div>
         </div>
+        <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+          <div className="text-lg font-bold text-gray-800">{currentWeather.windSpeed}</div>
+          <div className="text-[10px] text-gray-400">{wind} wind</div>
+        </div>
+        {aqiValue != null && (
+          <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+            <div className={`text-lg font-bold ${aqi.color}`}>{aqiValue}</div>
+            <div className="text-[10px] text-gray-400">AQI {aqi.label}</div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -183,8 +194,8 @@ export default function ConditionsTab({ hourly, currentWeather, heading, mode, i
         </div>
       )}
 
-      {/* Best ride window */}
-      <BestWindowCard hourly={hourly} isToday={isToday} />
+      {/* Current time details */}
+      <CurrentTimeCard currentWeather={currentWeather} airQuality={airQuality} hourlyAqi={hourlyAqi} />
 
       {/* Hourly breakdown table */}
       {hourly.length > 0 && (

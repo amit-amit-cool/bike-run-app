@@ -4,12 +4,14 @@ import HourlyWeatherStrip from './components/HourlyWeatherStrip'
 import StartScreen from './components/StartScreen'
 import ActiveScreen from './components/ActiveScreen'
 import SummaryScreen from './components/SummaryScreen'
+import HistoryScreen from './components/HistoryScreen'
 import ConditionsTab from './components/ConditionsTab'
 import PlanTab from './components/PlanTab'
 import MapView from './components/MapView'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useWeather } from './hooks/useWeather'
 import { useActivityTimer } from './hooks/useActivityTimer'
+import { useActivityHistory } from './hooks/useActivityHistory'
 import { useUpdateCheck } from './hooks/useUpdateCheck'
 
 const MAX_TRAIL = 500
@@ -35,7 +37,9 @@ export default function App() {
     airQuality, hourlyAqi,
   } = useWeather(position)
   const timer = useActivityTimer(isMoving, position, altitude, activityState, speedKmh)
+  const history = useActivityHistory()
   const latestRelease = useUpdateCheck()
+  const didSaveRef = useRef(false)
 
   // Accumulate trail during active/paused states
   const lastTrailPos = useRef(null)
@@ -56,10 +60,41 @@ export default function App() {
     }
   }, [position, activityState])
 
+  // Auto-save activity to history when finished
+  useEffect(() => {
+    if (activityState === 'finished' && !didSaveRef.current && timer.totalDistanceKm > 0) {
+      didSaveRef.current = true
+      const hours = timer.movingMs / 3_600_000
+      const speedKmhAvg = hours > 0 ? timer.totalDistanceKm / hours : 0
+      let met = mode === 'bike'
+        ? (speedKmhAvg < 16 ? 6.8 : speedKmhAvg < 20 ? 8.0 : speedKmhAvg < 25 ? 10.0 : 12.0)
+        : (speedKmhAvg < 8 ? 8.3 : speedKmhAvg < 10 ? 10.0 : speedKmhAvg < 12 ? 11.5 : 13.5)
+      if (timer.elevGainM > 0 && hours > 0) met += Math.min(2, (timer.elevGainM / hours / 100) * 0.5)
+      const calories = Math.round(met * 70 * hours)
+
+      history.saveActivity({
+        mode,
+        title: mode === 'bike' ? 'Ride' : 'Run',
+        distanceKm: timer.totalDistanceKm,
+        elapsedMs: timer.elapsedMs,
+        movingMs: timer.movingMs,
+        avgSpeedKmh: timer.avgSpeedKmh,
+        maxSpeedKmh: timer.maxSpeedKmh,
+        elevGainM: timer.elevGainM,
+        elevLossM: timer.elevLossM,
+        calories,
+        splits: timer.splits,
+        weather: currentWeather ? { temp: currentWeather.temp, wind: currentWeather.windSpeed, uv: currentWeather.uv, code: currentWeather.code } : null,
+        aqi: airQuality?.usAqi ?? null,
+      })
+    }
+  }, [activityState, timer, mode, currentWeather, airQuality, history])
+
   const handleStart = () => {
     timer.reset()
     setTrail([])
     lastTrailPos.current = null
+    didSaveRef.current = false
     setActivityState('active')
     setActiveTab('activity')
   }
@@ -86,6 +121,7 @@ export default function App() {
     timer.reset()
     setTrail([])
     lastTrailPos.current = null
+    didSaveRef.current = false
     setPlannedRoute([])
     setPlanDestCoords(null)
     setPlanDestName('')
@@ -102,6 +138,7 @@ export default function App() {
     { id: 'activity', label: isTracking ? (mode === 'bike' ? 'Ride' : 'Run') : 'Activity', icon: mode === 'bike' ? '🚴' : '🏃' },
     { id: 'plan', label: 'Plan', icon: '🗺️' },
     { id: 'conditions', label: 'Conditions', icon: '🌤' },
+    { id: 'history', label: 'History', icon: '📋' },
   ]
 
   return (
@@ -165,6 +202,15 @@ export default function App() {
               hourlyAqi={hourlyAqi}
             />
           </>
+        )}
+
+        {/* ── HISTORY TAB ──────────────────────────────────── */}
+        {activeTab === 'history' && (
+          <HistoryScreen
+            activities={history.activities}
+            onDelete={history.deleteActivity}
+            onRename={history.renameActivity}
+          />
         )}
 
         {/* ── ACTIVITY TAB ────────────────────────────────── */}
