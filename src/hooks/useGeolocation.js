@@ -84,13 +84,20 @@ function useNativeGeolocation() {
   const [gpsWaitSecs, setGpsWaitSecs] = useState(0)
   const watchIdRef = useRef(null)
   const cleanupRef = useRef(null)
+  const retryTimer = useRef(null)
 
   useEffect(() => {
     let cancelled = false
 
-    const init = async () => {
+    const startWatch = async () => {
+      // Clean up previous watch if retrying
+      if (watchIdRef.current != null) {
+        await Geolocation.clearWatch({ id: watchIdRef.current }).catch(() => {})
+        watchIdRef.current = null
+      }
+      cleanupRef.current?.()
+
       try {
-        // Request permissions — on Android 10+ this covers background location
         const perm = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] })
         if (cancelled) return
         if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
@@ -107,24 +114,39 @@ function useNativeGeolocation() {
 
       try {
         watchIdRef.current = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 10000 },
+          { enableHighAccuracy: true, timeout: 30000 },
           (pos, err) => {
             if (cancelled) return
-            if (err) { setError(err.message ?? 'GPS error'); return }
+            if (err) {
+              setError(err.message ?? 'GPS error')
+              // Retry after 3s on error
+              clearTimeout(retryTimer.current)
+              retryTimer.current = setTimeout(() => {
+                if (!cancelled) startWatch()
+              }, 3000)
+              return
+            }
             if (!pos) return
+            clearTimeout(retryTimer.current)
             const { latitude, longitude, accuracy, speed, heading: hdg, altitude: alt } = pos.coords
             process(latitude, longitude, accuracy, speed, hdg, alt, pos.timestamp)
           }
         )
       } catch (e) {
         setError(e.message ?? 'GPS unavailable')
+        // Retry after 3s
+        clearTimeout(retryTimer.current)
+        retryTimer.current = setTimeout(() => {
+          if (!cancelled) startWatch()
+        }, 3000)
       }
     }
 
-    init()
+    startWatch()
 
     return () => {
       cancelled = true
+      clearTimeout(retryTimer.current)
       cleanupRef.current?.()
       if (watchIdRef.current != null) {
         Geolocation.clearWatch({ id: watchIdRef.current })
@@ -147,7 +169,6 @@ function useWebGeolocation() {
   const [gpsWaitSecs, setGpsWaitSecs] = useState(0)
   const watchIdRef = useRef(null)
   const cleanupRef = useRef(null)
-
   const retryTimer = useRef(null)
 
   const start = useCallback(() => {
@@ -166,7 +187,7 @@ function useWebGeolocation() {
       (err) => {
         setError(err.message)
         setGpsReady(false)
-        // Retry after 2s — handles permission grant not restarting the watcher
+        // Retry after 3s — handles permission grant not restarting the watcher
         clearTimeout(retryTimer.current)
         retryTimer.current = setTimeout(() => {
           if (watchIdRef.current != null) {
@@ -174,9 +195,9 @@ function useWebGeolocation() {
           }
           cleanupRef.current?.()
           start()
-        }, 2000)
+        }, 3000)
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
     )
   }, [])
 
@@ -195,8 +216,9 @@ function useWebGeolocation() {
 }
 
 // ─── Auto-select platform ────────────────────────────────────────────────────
+const isNative = Capacitor.isNativePlatform()
+
 export function useGeolocation() {
-  const isNative = Capacitor.isNativePlatform()
   const native = useNativeGeolocation()
   const web = useWebGeolocation()
   return isNative ? native : web
