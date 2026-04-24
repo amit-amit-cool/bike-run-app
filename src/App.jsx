@@ -8,6 +8,7 @@ import HistoryScreen from './components/HistoryScreen'
 import ConditionsTab from './components/ConditionsTab'
 import PlanTab from './components/PlanTab'
 import MapView from './components/MapView'
+import GpsBadge from './components/GpsBadge'
 import { useGeolocation } from './hooks/useGeolocation'
 import { useWeather } from './hooks/useWeather'
 import { useActivityTimer } from './hooks/useActivityTimer'
@@ -221,6 +222,9 @@ export default function App() {
             {activityState === 'idle' && (
               <>
                 <HourlyWeatherStrip hourly={hourly} loading={loading} error={weatherError} selectedDate={selectedDate} availableDates={availableDates} onDateChange={setSelectedDate} isToday={isToday} />
+                <div className="px-4 pt-2">
+                  <GpsBadge position={position} gpsReady={gpsReady} gpsWaitSecs={gpsWaitSecs} error={gpsError} altitude={altitude} />
+                </div>
                 <StartScreen
                   mode={mode}
                   currentWeather={currentWeather}
@@ -240,6 +244,9 @@ export default function App() {
             {/* ACTIVE / PAUSED */}
             {isTracking && (
               <>
+                <div className="px-4 pt-2">
+                  <GpsBadge position={position} gpsReady={gpsReady} gpsWaitSecs={gpsWaitSecs} error={gpsError} altitude={altitude} />
+                </div>
                 <ActiveScreen
                   speedKmh={speedKmh}
                   heading={heading}
